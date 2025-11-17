@@ -10,26 +10,12 @@ class AuthRemoteDataSource {
   AuthRemoteDataSource({required this.apiClient});
 
   /// Giả sử API của bạn trả JSON mà login_response_model.dart parse được.
-  Future<UserModel> login(String email, String password) async {
-    final request = LoginRequestModel(email: email, password: password);
+  Future<LoginResponseModel> login(String username, String password) async {
     final response = await apiClient.post(
-      '/auth/login', // chỉnh đường dẫn theo API bạn
-      data: request.toJson(),
+      '/api/auth/login',
+      data: {"username": username, "password": password},
     );
 
-    // Nếu bạn đã có LoginResponseModel class, dùng nó:
-    try {
-      // response là Dio Response; response.data thường là Map<String, dynamic>
-      final data = response.data;
-      // Nếu bạn đã có LoginResponseModel.fromJson:
-      // final loginResp = LoginResponseModel.fromJson(data);
-      // return UserModel.fromJson(loginResp.toJson()); // nếu loginResp có toJson
-
-      // Nếu không, map trực tiếp data -> UserModel
-      return UserModel.fromJson(data as Map<String, dynamic>);
-    } catch (e) {
-      // bọc lỗi để gọi bên ngoài xử lý
-      throw Exception('Login failed: $e');
-    }
+    return LoginResponseModel.fromJson(response.data);
   }
 }

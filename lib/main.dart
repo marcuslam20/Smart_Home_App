@@ -6,6 +6,7 @@ import 'core/di/injector.dart';
 import 'core/base/bloc_observer.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'smart_splash.dart';
+import 'features/home/presentation/pages/home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +29,7 @@ class SmartApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: ThemeData(primarySwatch: Colors.teal),
         home: const SmartSplashScreen(),
+        routes: {'/home': (_) => const HomePage()},
       ),
     );
   }

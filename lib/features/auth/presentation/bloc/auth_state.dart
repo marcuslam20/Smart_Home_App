@@ -8,8 +8,10 @@ class AuthInitial extends AuthState {}
 class AuthLoading extends AuthState {}
 
 class AuthSuccess extends AuthState {
-  final UserEntity user;
-  AuthSuccess(this.user);
+  final String token;
+  final String refreshToken;
+
+  AuthSuccess({required this.token, required this.refreshToken});
 }
 
 class AuthFailure extends AuthState {

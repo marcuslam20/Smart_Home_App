@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '/features/auth/presentation/bloc/auth_bloc.dart';
+import '/features/auth/presentation/bloc/auth_event.dart';
+import '/features/auth/presentation/bloc/auth_state.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -17,195 +22,226 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      resizeToAvoidBottomInset: true,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+    return BlocConsumer<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is AuthLoading) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (state is AuthSuccess) {
+          Navigator.pop(context); // đóng loading
+          Navigator.pushReplacementNamed(context, '/home');
+        }
+
+        if (state is AuthFailure) {
+          Navigator.pop(context); // đóng loading
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.message)));
+        }
+      },
+      builder: (context, state) {
+        return Scaffold(
+          backgroundColor: Colors.white,
+          resizeToAvoidBottomInset: true,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: _buildLoginContent(context),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLoginContent(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Nút back nằm sát mép trái
+        Padding(
+          padding: const EdgeInsets.only(left: 0),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Nút back nằm sát mép trái
-              Padding(
-                padding: const EdgeInsets.only(left: 0),
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-                  onPressed: () => Navigator.pop(context),
+              const SizedBox(height: 10),
+              const Text(
+                'Đăng nhập',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
-              const SizedBox(height: 16),
-              // Nội dung chính lùi vào cho cân đối
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Đăng nhập',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
+              const SizedBox(height: 32),
 
-                    // Country dropdown
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: selectedCountry,
-                          isExpanded: true,
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'Vietnam',
-                              child: Text('Vietnam'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'Singapore',
-                              child: Text('Singapore'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'United States',
-                              child: Text('United States'),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            setState(() => selectedCountry = value!);
-                          },
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Username
-                    _buildInputField(
-                      controller: usernameController,
-                      labelText: 'Vui lòng nhập tài khoản',
-                      hasClearButton: true,
-                    ),
-
-                    const SizedBox(height: 26),
-
-                    // Password
-                    _buildInputField(
-                      controller: passwordController,
-                      labelText: 'Mật khẩu',
-                      obscureText: obscurePassword,
-                      hasClearButton: true,
-                      hasVisibilityToggle: true,
-                    ),
-
-                    const SizedBox(height: 48),
-
-                    // Agreement
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Checkbox(
-                          value: agreePolicy,
-                          onChanged: (v) => setState(() => agreePolicy = v!),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        Expanded(
-                          child: Wrap(
-                            children: [
-                              const Text(
-                                'Tôi đồng ý ',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                              _buildLinkText('Chính sách về quyền riêng tư'),
-                              const Text(', ', style: TextStyle(fontSize: 13)),
-                              _buildLinkText('Thỏa thuận người dùng'),
-                              const Text(
-                                ' và ',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                              _buildLinkText("Children's Privacy Statement"),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Login button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: agreePolicy ? () {} : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFFE0D5),
-                          disabledBackgroundColor: const Color(0xFFFFE0D5),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: const Text(
-                          'Đăng nhập',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Forgot password
-                    Center(
-                      child: TextButton(
-                        onPressed: () {},
-                        child: const Text(
-                          'Quên mật khẩu',
-                          style: TextStyle(color: Colors.blue, fontSize: 15),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 96),
-
-                    // Social login
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildSocialButton('assets/icons/google_logo.png'),
-                        const SizedBox(width: 40),
-                        _buildSocialButton('assets/icons/apple_logo.png'),
-                      ],
-                    ),
-                  ],
+              // Country dropdown
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
                 ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: selectedCountry,
+                    isExpanded: true,
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Vietnam',
+                        child: Text('Vietnam'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Singapore',
+                        child: Text('Singapore'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'United States',
+                        child: Text('United States'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setState(() => selectedCountry = value!);
+                    },
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Username
+              _buildInputField(
+                controller: usernameController,
+                labelText: 'Vui lòng nhập tài khoản',
+                hasClearButton: true,
+              ),
+
+              const SizedBox(height: 16),
+
+              // Password
+              _buildInputField(
+                controller: passwordController,
+                labelText: 'Mật khẩu',
+                obscureText: obscurePassword,
+                hasClearButton: true,
+                hasVisibilityToggle: true,
+              ),
+
+              const SizedBox(height: 36),
+
+              // Agreement
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Checkbox(
+                    value: agreePolicy,
+                    onChanged: (v) => setState(() => agreePolicy = v!),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  Expanded(
+                    child: Wrap(
+                      children: [
+                        const Text(
+                          'Tôi đồng ý ',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        _buildLinkText('Chính sách về quyền riêng tư'),
+                        const Text(', ', style: TextStyle(fontSize: 13)),
+                        _buildLinkText('Thỏa thuận người dùng'),
+                        const Text(' và ', style: TextStyle(fontSize: 13)),
+                        _buildLinkText("Children's Privacy Statement"),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // Login button
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: agreePolicy
+                      ? () {
+                          context.read<AuthBloc>().add(
+                            LoginRequested(
+                              usernameController.text.trim(),
+                              passwordController.text.trim(),
+                            ),
+                          );
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFE0D5),
+                    disabledBackgroundColor: const Color(0xFFFFE0D5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Đăng nhập',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              Center(
+                child: TextButton(
+                  onPressed: () {},
+                  child: const Text(
+                    'Quên mật khẩu',
+                    style: TextStyle(color: Colors.blue, fontSize: 15),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 80),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildSocialButton('assets/icons/google_logo.png'),
+                  const SizedBox(width: 40),
+                  _buildSocialButton('assets/icons/apple_logo.png'),
+                ],
               ),
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 
-  //=============================
-  // Widgets phụ
-  //=============================
-
+  // Input field widget
   Widget _buildInputField({
     required TextEditingController controller,
     required String labelText,
@@ -236,7 +272,6 @@ class _LoginPageState extends State<LoginPage> {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Colors.teal, width: 1.2),
         ),
-        alignLabelWithHint: true,
         suffixIcon: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

@@ -9,11 +9,13 @@ import '../../features/auth/domain/repositories/auth_repository.dart';
 final sl = GetIt.instance;
 
 Future<void> setupInjector() async {
-  sl.registerLazySingleton(() => ApiClient(baseUrl: 'https://your-api.com'));
+  sl.registerLazySingleton(
+    () => ApiClient(baseUrl: 'https://performentmarketing.ddnsgeek.com'),
+  );
   sl.registerLazySingleton(() => AuthRemoteDataSource(apiClient: sl()));
   sl.registerLazySingleton<AuthRepository>(
     () => AuthRepositoryImpl(remoteDataSource: sl()),
   );
   sl.registerLazySingleton(() => LoginUseCase(sl()));
-  sl.registerFactory(() => AuthBloc(sl()));
+  sl.registerFactory(() => AuthBloc(loginUseCase: sl()));
 }
