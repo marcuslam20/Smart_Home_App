@@ -6,3 +6,8 @@ class LoginRequested extends AuthEvent {
   final String password;
   LoginRequested(this.username, this.password);
 }
+
+// THÊM MỚI
+class LogoutEvent extends AuthEvent {}
+
+class CheckAuthStatusEvent extends AuthEvent {}

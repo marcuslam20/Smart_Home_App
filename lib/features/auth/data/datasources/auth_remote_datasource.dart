@@ -4,6 +4,7 @@ import '../../../../core/network/api_client.dart';
 import '../models/login_request_model.dart';
 import '../models/login_response_model.dart';
 import '../models/user_model.dart';
+import '../models/user_response_model.dart';
 
 class AuthRemoteDataSource {
   final ApiClient apiClient;
@@ -17,5 +18,10 @@ class AuthRemoteDataSource {
     );
 
     return LoginResponseModel.fromJson(response.data);
+  }
+
+  Future<UserResponseModel> getCurrentUser() async {
+    final response = await apiClient.get('/api/auth/user');
+    return UserResponseModel.fromJson(response.data);
   }
 }

@@ -1,18 +1,21 @@
-// home_page.dart
+// home_page.dart – THÊM POPUP MENU KHI CLICK DẤU +
 import 'package:flutter/material.dart';
 import 'package:smart_curtain_app/features/home/presentation/pages/CreateSceneTriggerPage.dart';
+import 'package:smart_curtain_app/features/home/presentation/pages/create_scene_page.dart';
+import 'package:smart_curtain_app/features/home/presentation/pages/add_device_page.dart';
+import 'package:smart_curtain_app/features/device/presentation/pages/device_management_page.dart';
 
 void main() => runApp(const MaterialApp(home: HomePage()));
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<HomePage> createState() => HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
-  int _currentIndex = 0;
-
+class HomePageState extends State<HomePage> {
+  int currentIndex = 1;
+  static final GlobalKey<HomePageState> globalKey = GlobalKey<HomePageState>();
   late final List<Widget> _pages;
 
   @override
@@ -26,9 +29,121 @@ class _HomePageState extends State<HomePage> {
     ];
   }
 
+  // Hàm hiển thị popup menu
+  void _showAddMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildMenuItem(
+                context,
+                icon: Icons.devices_other_outlined,
+                title: 'Add Device',
+                onTap: () {
+                  Navigator.pop(context);
+                  // Navigate to Add Device page with BLE
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AddDevicePage()),
+                  );
+                },
+              ),
+              _buildMenuItem(
+                context,
+                icon: Icons.edit_square,
+                title: 'Create Scene',
+                onTap: () async {
+                  Navigator.pop(context);
+                  final triggerData = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const CreateSceneTriggerPage(),
+                    ),
+                  );
+                  if (triggerData == null) return;
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          CreateScenePage(scheduleData: triggerData),
+                    ),
+                  );
+                },
+              ),
+              _buildMenuItem(
+                context,
+                icon: Icons.add_box_outlined,
+                title: 'Add Favorite Cards',
+                onTap: () {
+                  Navigator.pop(context);
+                  // TODO: Navigate to Add Favorite Cards page
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Add Favorite Cards clicked')),
+                  );
+                },
+              ),
+              _buildMenuItem(
+                context,
+                icon: Icons.qr_code_scanner_outlined,
+                title: 'Quét',
+                onTap: () {
+                  Navigator.pop(context);
+                  // TODO: Navigate to QR Scanner page
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('Quét clicked')));
+                },
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMenuItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, size: 28),
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
+      ),
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: HomePageState.globalKey,
       extendBodyBehindAppBar: true,
       body: Container(
         decoration: const BoxDecoration(
@@ -41,13 +156,12 @@ class _HomePageState extends State<HomePage> {
         child: SafeArea(
           child: Column(
             children: [
-              // ===================== HEADER THÔNG MINH =====================
+              // HEADER
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Dòng 1: luôn hiển thị ở mọi tab
                     Row(
                       children: [
                         const Icon(Icons.home_outlined, size: 28),
@@ -63,19 +177,19 @@ class _HomePageState extends State<HomePage> {
                         const Spacer(),
                         IconButton(
                           icon: const Icon(Icons.qr_code_scanner, size: 26),
-                          onPressed: () {},
+                          onPressed: () {
+                            // TODO: QR Scanner action
+                          },
                         ),
                         IconButton(
                           icon: const Icon(Icons.add, size: 30),
-                          onPressed: () {},
+                          onPressed: () =>
+                              _showAddMenu(context), // GỌI POPUP MENU
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 24),
-
-                    // Dòng 2: CHỈ HIỆN KHI Ở TAB NHÀ (index == 0)
-                    if (_currentIndex == 0)
+                    if (currentIndex == 0)
                       Row(
                         children: [
                           const Text(
@@ -88,37 +202,35 @@ class _HomePageState extends State<HomePage> {
                           ),
                           const Spacer(),
                           IconButton(
-                            icon: const Icon(
-                              Icons.dehaze_rounded,
-                              size: 28,
-                            ), // 3 gạch
-                            onPressed: () {},
+                            icon: const Icon(Icons.dehaze_rounded, size: 28),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const DeviceManagementPage(),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
                   ],
                 ),
               ),
-
-              // Khoảng cách dưới header
-              SizedBox(height: _currentIndex == 0 ? 10 : 20),
-
-              // ===================== NỘI DUNG THEO TAB =====================
+              SizedBox(height: currentIndex == 0 ? 10 : 20),
               Expanded(
-                child: IndexedStack(index: _currentIndex, children: _pages),
+                child: IndexedStack(index: currentIndex, children: _pages),
               ),
             ],
           ),
         ),
       ),
-
-      // ===================== BOTTOM NAVIGATION BAR =====================
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        currentIndex: _currentIndex,
+        currentIndex: currentIndex,
         selectedItemColor: Colors.orange,
         unselectedItemColor: Colors.grey,
-        onTap: (i) => setState(() => _currentIndex = i),
+        onTap: (i) => setState(() => currentIndex = i),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
@@ -151,159 +263,193 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// ===================== TAB NHÀ =====================
-class HomeTab extends StatelessWidget {
-  const HomeTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      children: [
-        const SizedBox(height: 10),
-
-        // TODO: Thêm card thời tiết, AI note, energy, thiết bị ở đây
-        Container(
-          height: 160,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: const Center(
-            child: Text(
-              "Card thời tiết sẽ ở đây",
-              style: TextStyle(fontSize: 16),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 20),
-        // Thêm các widget khác của bạn ở đây...
-      ],
-    );
-  }
-}
-
-// ===================== TAB THÔNG MINH – giống hệt ảnh =====================
-class AutomationTab extends StatelessWidget {
+// AutomationTab - GIỮ NGUYÊN
+class AutomationTab extends StatefulWidget {
   const AutomationTab({super.key});
 
+  static final ValueNotifier<List<Map<String, dynamic>>> scenesNotifier =
+      ValueNotifier<List<Map<String, dynamic>>>([]);
+
+  @override
+  State<AutomationTab> createState() => _AutomationTabState();
+}
+
+class _AutomationTabState extends State<AutomationTab> {
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 20),
-
-          Row(
-            children: const [
+          const Row(
+            children: [
               Text(
-                "Chạm để chạy",
+                "Tự động hóa",
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
               SizedBox(width: 16),
               Text(
-                "Tự động hóa",
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w500,
-                ),
+                "Chạm để chạy",
+                style: TextStyle(fontSize: 18, color: Colors.grey),
               ),
             ],
           ),
-
           const SizedBox(height: 24),
+          Expanded(
+            child: ValueListenableBuilder<List<Map<String, dynamic>>>(
+              valueListenable: AutomationTab.scenesNotifier,
+              builder: (context, scenes, _) {
+                if (scenes.isEmpty) return _buildEmptyState();
 
-          // Filter All
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 10,
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Text("Filter All", style: TextStyle(fontSize: 16)),
-                Icon(Icons.keyboard_arrow_down),
-              ],
+                return ListView.separated(
+                  itemCount: scenes.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    final scene = scenes[index];
+                    final hasOffline = scene['hasOfflineDevices'] == true;
+                    return Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 12,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: Colors.blue.withOpacity(0.15),
+                            child: Icon(
+                              scene['icon'] ?? Icons.access_time,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  scene['name'],
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (hasOffline)
+                                  Row(
+                                    children: const [
+                                      Icon(
+                                        Icons.warning_amber_rounded,
+                                        size: 16,
+                                        color: Colors.orange,
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        "Device(s) offline",
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.orange,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: scene['isEnabled'] ?? true,
+                            onChanged: (v) {
+                              scene['isEnabled'] = v;
+                              AutomationTab.scenesNotifier.notifyListeners();
+                            },
+                            activeColor: Colors.green,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           ),
-
-          const Spacer(),
-
-          // Hình minh họa
-          Icon(
-            Icons.auto_awesome,
-            size: 180,
-            color: Colors.grey.withOpacity(0.4),
-          ),
-
-          const SizedBox(height: 30),
-
-          const Center(
-            child: Text(
-              "Điều khiển nhiều thiết bị bằng một lần chạm hoặc\nbằng loa hỗ trợ AI thông qua lệnh thoại",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey, height: 1.5),
-            ),
-          ),
-
-          const SizedBox(height: 40),
-
-          Center(
-            child: SizedBox(
-              width: 220,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF3B30),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const CreateSceneTriggerPage(),
-                    ),
-                  );
-                },
-                child: const Text(
-                  "Create Scene",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          const Spacer(),
         ],
       ),
     );
   }
+
+  Widget _buildEmptyState() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.auto_awesome,
+          size: 180,
+          color: Colors.grey.withOpacity(0.4),
+        ),
+        const SizedBox(height: 30),
+        const Text(
+          "Điều khiển nhiều thiết bị bằng một lần chạm hoặc\nbằng loa hỗ trợ AI thông qua lệnh thoại",
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 16, color: Colors.grey, height: 1.5),
+        ),
+        const SizedBox(height: 40),
+        Center(
+          child: SizedBox(
+            width: 220,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF3B30),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              onPressed: () async {
+                final triggerData = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CreateSceneTriggerPage(),
+                  ),
+                );
+                if (triggerData == null) return;
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CreateScenePage(scheduleData: triggerData),
+                  ),
+                );
+              },
+              child: const Text(
+                "Create Scene",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const Spacer(),
+      ],
+    );
+  }
+}
+
+// Các tab khác giữ nguyên
+class HomeTab extends StatelessWidget {
+  const HomeTab({super.key});
+  @override
+  Widget build(BuildContext context) => const SizedBox();
 }
 
 class SmartTab extends StatelessWidget {

@@ -26,7 +26,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
       return Right(response);
     } catch (e) {
-      return Left(Failure(e.toString()));
+      return Left(ServerFailure(e.toString(), message: ''));
     }
   }
 }
