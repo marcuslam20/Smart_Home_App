@@ -1,4 +1,6 @@
 // lib/features/device/presentation/pages/device_control_page.dart
+// RÈM DỌC ĐẸP – 3 NÚT NHỎ Ở DƯỚI – % NHỎ GỌN – CHẠY MƯỢT
+
 import 'package:flutter/material.dart';
 import '../../domain/entities/device_entity.dart';
 
@@ -12,63 +14,67 @@ class DeviceControlPage extends StatefulWidget {
 
 class _DeviceControlPageState extends State<DeviceControlPage>
     with TickerProviderStateMixin {
-  double _position = 0.0; // 0.0 = mở hoàn toàn, 1.0 = đóng hoàn toàn
+  double _position =
+      0.0; // 0.0 = mở hoàn toàn (rèm lên), 1.0 = đóng hoàn toàn (rèm xuống)
   bool _isRunning = false;
 
+  late final AnimationController _controller;
   late final AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 3500),
+      vsync: this,
+    );
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
+
+    _controller.addListener(() {
+      setState(() => _position = _controller.value);
+    });
   }
 
   @override
   void dispose() {
+    _controller.dispose();
     _pulseController.dispose();
     super.dispose();
-  }
-
-  /// Hàm cập nhật vị trí rèm dựa vào thiết bị thật
-  void _updateDevicePosition(double newPosition) {
-    setState(() {
-      _position = newPosition.clamp(0.0, 1.0);
-    });
   }
 
   void _sendCommand(String command) {
     if (_isRunning && command != 'STOP') return;
 
-    setState(() => _isRunning = command != 'STOP');
+    setState(() => _isRunning = true);
+    _pulseController.repeat(reverse: true);
 
-    if (_isRunning)
-      _pulseController.repeat(reverse: true);
-    else {
+    if (command == 'OPEN') {
+      _controller.animateTo(0.0, curve: Curves.easeInOut);
+    } else if (command == 'CLOSE') {
+      _controller.animateTo(1.0, curve: Curves.easeInOut);
+    } else if (command == 'STOP') {
+      _controller.stop();
       _pulseController.stop();
       _pulseController.reset();
+      setState(() => _isRunning = false);
+      return;
     }
 
-    // Gửi lệnh tới thiết bị
-    switch (command) {
-      case 'OPEN':
-        // TODO: Gọi API / SDK thiết bị để mở rèm
-        break;
-      case 'CLOSE':
-        // TODO: Gọi API / SDK thiết bị để đóng rèm
-        break;
-      case 'STOP':
-        // TODO: Gọi API / SDK thiết bị để dừng motor
-        break;
-    }
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed ||
+          status == AnimationStatus.dismissed) {
+        _pulseController.stop();
+        _pulseController.reset();
+        setState(() => _isRunning = false);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final displayPercent = (100 - (_position * 100)).toInt();
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -125,65 +131,57 @@ class _DeviceControlPageState extends State<DeviceControlPage>
 
           const SizedBox(height: 80),
 
-          // RÈM DỌC – bám tốc độ motor thật
+          // RÈM DỌC ĐẸP
           Expanded(
-            child: AnimatedAlign(
-              alignment: Alignment.topCenter,
-              heightFactor: _position,
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.linear,
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1 + 0.2 * _position),
-                      blurRadius: 30,
-                      offset: const Offset(0, 10),
+            child: Stack(
+              children: [
+                Container(color: Colors.grey.shade50),
+                ClipRect(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    heightFactor: _position,
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 30,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: CustomPaint(
+                        painter: VerticalCurtainPainter(),
+                        size: Size.infinite,
+                      ),
                     ),
-                  ],
+                  ),
                 ),
-                child: CustomPaint(
-                  painter: VerticalCurtainPainter(position: _position),
-                  size: Size.infinite,
-                ),
-              ),
+              ],
             ),
           ),
 
           const SizedBox(height: 40),
 
-          // CHỈ SỐ %
-          TweenAnimationBuilder<double>(
-            tween: Tween<double>(
-              begin: displayPercent.toDouble(),
-              end: displayPercent.toDouble(),
+          // PHẦN TRĂM NHỎ GỌN
+          Text(
+            '${(100 - (_position * 100)).toInt()}%',
+            style: const TextStyle(
+              fontSize: 40,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
             ),
-            duration: const Duration(milliseconds: 500),
-            builder: (context, value, child) {
-              return Column(
-                children: [
-                  Text(
-                    '${value.toInt()}%',
-                    style: const TextStyle(
-                      fontSize: 40,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _position == 0
-                        ? 'Mở hoàn toàn'
-                        : _position == 1
-                        ? 'Đóng hoàn toàn'
-                        : 'Đang di chuyển',
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                  ),
-                ],
-              );
-            },
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _position == 0
+                ? 'Mở hoàn toàn'
+                : _position == 1
+                ? 'Đóng hoàn toàn'
+                : 'Đang di chuyển',
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
           ),
 
           const SizedBox(height: 40),
@@ -195,19 +193,16 @@ class _DeviceControlPageState extends State<DeviceControlPage>
               _SmallButton(
                 icon: Icons.keyboard_arrow_up_rounded,
                 onTap: () => _sendCommand('OPEN'),
-                pulseController: _pulseController,
               ),
               const SizedBox(width: 40),
               _SmallButton(
                 icon: Icons.pause_rounded,
                 onTap: () => _sendCommand('STOP'),
-                pulseController: _pulseController,
               ),
               const SizedBox(width: 40),
               _SmallButton(
                 icon: Icons.keyboard_arrow_down_rounded,
                 onTap: () => _sendCommand('CLOSE'),
-                pulseController: _pulseController,
               ),
             ],
           ),
@@ -233,52 +228,36 @@ class _DeviceControlPageState extends State<DeviceControlPage>
     );
   }
 
-  Widget _SmallButton({
-    required IconData icon,
-    required VoidCallback onTap,
-    required AnimationController pulseController,
-  }) {
-    return AnimatedBuilder(
-      animation: pulseController,
-      builder: (_, __) {
-        double scale = 1.0 + 0.1 * pulseController.value;
-        return Transform.scale(
-          scale: scale,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(18),
-              onTap: onTap,
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.blue.shade300, width: 1.8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blue.withOpacity(0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Icon(icon, color: Colors.blue.shade700, size: 24),
+  Widget _SmallButton({required IconData icon, required VoidCallback onTap}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.blue.shade300, width: 1.8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.blue.withOpacity(0.2),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
-            ),
+            ],
           ),
-        );
-      },
+          child: Icon(icon, color: Colors.blue.shade700, size: 24),
+        ),
+      ),
     );
   }
 }
 
-// VẼ RÈM DỌC – sóng mềm theo vị trí
+// VẼ RÈM DỌC ĐẸP NHƯ HÌNH BẠN GỬI
 class VerticalCurtainPainter extends CustomPainter {
-  final double position;
-  VerticalCurtainPainter({this.position = 0.0});
-
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
@@ -288,9 +267,7 @@ class VerticalCurtainPainter extends CustomPainter {
 
     final path = Path();
     final segments = 22;
-    final maxWaveHeight = 40.0;
-    final waveHeight =
-        maxWaveHeight * (1 - position); // càng đóng, sóng nhỏ hơn
+    final waveHeight = 40.0;
 
     for (int i = 0; i < segments; i++) {
       double y = i * (size.height / (segments - 1));
@@ -313,6 +290,5 @@ class VerticalCurtainPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant VerticalCurtainPainter old) =>
-      old.position != position;
+  bool shouldRepaint(covariant CustomPainter old) => false;
 }
