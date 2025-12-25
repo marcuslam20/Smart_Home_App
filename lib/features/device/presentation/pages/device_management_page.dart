@@ -438,8 +438,7 @@ class _DeviceManagementPageState extends State<DeviceManagementPage> {
             _buildDetailRow('Type', device.type),
             _buildDetailRow('Connection', device.connectionType ?? '-'),
             _buildDetailRow('Status', device.isOnline ? 'Online' : 'Offline'),
-            if (device.macAddress != null)
-              _buildDetailRow('MAC', device.macAddress!),
+            if (device.id != null) _buildDetailRow('Device ID', device.id!),
             const SizedBox(height: 24),
             ElevatedButton(
               style: ElevatedButton.styleFrom(

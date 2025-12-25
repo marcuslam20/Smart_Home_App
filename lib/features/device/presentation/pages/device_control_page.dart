@@ -1,8 +1,7 @@
-// lib/features/device/presentation/pages/device_control_page.dart
-// RÈM DỌC ĐẸP – 3 NÚT NHỎ Ở DƯỚI – % NHỎ GỌN – CHẠY MƯỢT
-
 import 'package:flutter/material.dart';
 import '../../domain/entities/device_entity.dart';
+import '../../domain/usecases/send_device_command.dart';
+import '../../../../core/di/injector.dart';
 
 class DeviceControlPage extends StatefulWidget {
   final DeviceEntity device;
@@ -14,12 +13,12 @@ class DeviceControlPage extends StatefulWidget {
 
 class _DeviceControlPageState extends State<DeviceControlPage>
     with TickerProviderStateMixin {
-  double _position =
-      0.0; // 0.0 = mở hoàn toàn (rèm lên), 1.0 = đóng hoàn toàn (rèm xuống)
+  double _position = 0.0; // 0.0 = mở, 1.0 = đóng
   bool _isRunning = false;
 
   late final AnimationController _controller;
   late final AnimationController _pulseController;
+  late final SendDeviceCommand _sendDeviceCommand;
 
   @override
   void initState() {
@@ -33,6 +32,9 @@ class _DeviceControlPageState extends State<DeviceControlPage>
       vsync: this,
     );
 
+    // INJECT USE CASE
+    _sendDeviceCommand = sl<SendDeviceCommand>();
+
     _controller.addListener(() {
       setState(() => _position = _controller.value);
     });
@@ -45,32 +47,72 @@ class _DeviceControlPageState extends State<DeviceControlPage>
     super.dispose();
   }
 
-  void _sendCommand(String command) {
+  Future<void> _sendCommand(String command) async {
     if (_isRunning && command != 'STOP') return;
 
     setState(() => _isRunning = true);
     _pulseController.repeat(reverse: true);
 
-    if (command == 'OPEN') {
-      _controller.animateTo(0.0, curve: Curves.easeInOut);
-    } else if (command == 'CLOSE') {
-      _controller.animateTo(1.0, curve: Curves.easeInOut);
-    } else if (command == 'STOP') {
-      _controller.stop();
+    try {
+      print('📤 Sending $command to device ${widget.device.id}');
+
+      // GỌI API THẬT
+      final result = await _sendDeviceCommand(widget.device.id, command);
+
+      result.fold(
+        (failure) {
+          // Lỗi từ API
+          print('❌ API Error: ${failure.message}');
+          _showSnackBar('Lỗi: ${failure.message}', Colors.red);
+          _pulseController.stop();
+          _pulseController.reset();
+          setState(() => _isRunning = false);
+        },
+        (_) {
+          // Thành công → Chạy animation
+          print('✅ Command sent successfully');
+          _showSnackBar('✓ Lệnh đã gửi', Colors.green);
+
+          if (command == 'OPEN') {
+            _controller.animateTo(0.0, curve: Curves.easeInOut);
+          } else if (command == 'CLOSE') {
+            _controller.animateTo(1.0, curve: Curves.easeInOut);
+          } else if (command == 'STOP') {
+            _controller.stop();
+            _pulseController.stop();
+            _pulseController.reset();
+            setState(() => _isRunning = false);
+            return;
+          }
+
+          _controller.addStatusListener((status) {
+            if (status == AnimationStatus.completed ||
+                status == AnimationStatus.dismissed) {
+              _pulseController.stop();
+              _pulseController.reset();
+              setState(() => _isRunning = false);
+            }
+          });
+        },
+      );
+    } catch (e) {
+      print('❌ Exception: $e');
+      _showSnackBar('Lỗi kết nối', Colors.red);
       _pulseController.stop();
       _pulseController.reset();
       setState(() => _isRunning = false);
-      return;
     }
+  }
 
-    _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed ||
-          status == AnimationStatus.dismissed) {
-        _pulseController.stop();
-        _pulseController.reset();
-        setState(() => _isRunning = false);
-      }
-    });
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -103,7 +145,7 @@ class _DeviceControlPageState extends State<DeviceControlPage>
         children: [
           const SizedBox(height: 30),
 
-          // THANH RAY + MOTOR NHẤP NHÁY
+          // THANH RAY + MOTOR
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 60),
             height: 12,
@@ -131,7 +173,7 @@ class _DeviceControlPageState extends State<DeviceControlPage>
 
           const SizedBox(height: 80),
 
-          // RÈM DỌC ĐẸP
+          // RÈM DỌC
           Expanded(
             child: Stack(
               children: [
@@ -165,7 +207,7 @@ class _DeviceControlPageState extends State<DeviceControlPage>
 
           const SizedBox(height: 40),
 
-          // PHẦN TRĂM NHỎ GỌN
+          // PHẦN TRĂM
           Text(
             '${(100 - (_position * 100)).toInt()}%',
             style: const TextStyle(
@@ -186,23 +228,26 @@ class _DeviceControlPageState extends State<DeviceControlPage>
 
           const SizedBox(height: 40),
 
-          // 3 NÚT NHỎ GỌN Ở DƯỚI RÈM – NẰM GIỮA
+          // 3 NÚT ĐIỀU KHIỂN
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _SmallButton(
                 icon: Icons.keyboard_arrow_up_rounded,
                 onTap: () => _sendCommand('OPEN'),
+                disabled: _isRunning,
               ),
               const SizedBox(width: 40),
               _SmallButton(
                 icon: Icons.pause_rounded,
                 onTap: () => _sendCommand('STOP'),
+                disabled: false,
               ),
               const SizedBox(width: 40),
               _SmallButton(
                 icon: Icons.keyboard_arrow_down_rounded,
                 onTap: () => _sendCommand('CLOSE'),
+                disabled: _isRunning,
               ),
             ],
           ),
@@ -228,35 +273,49 @@ class _DeviceControlPageState extends State<DeviceControlPage>
     );
   }
 
-  Widget _SmallButton({required IconData icon, required VoidCallback onTap}) {
+  Widget _SmallButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    bool disabled = false,
+  }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
+        onTap: disabled ? null : onTap,
         child: Container(
           width: 52,
           height: 52,
           decoration: BoxDecoration(
-            color: Colors.blue.shade50.withOpacity(0.9),
+            color: disabled
+                ? Colors.grey.shade200
+                : Colors.blue.shade50.withOpacity(0.9),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.blue.shade300, width: 1.8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.blue.withOpacity(0.2),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
+            border: Border.all(
+              color: disabled ? Colors.grey.shade400 : Colors.blue.shade300,
+              width: 1.8,
+            ),
+            boxShadow: disabled
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.blue.withOpacity(0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
           ),
-          child: Icon(icon, color: Colors.blue.shade700, size: 24),
+          child: Icon(
+            icon,
+            color: disabled ? Colors.grey.shade500 : Colors.blue.shade700,
+            size: 24,
+          ),
         ),
       ),
     );
   }
 }
 
-// VẼ RÈM DỌC ĐẸP NHƯ HÌNH BẠN GỬI
 class VerticalCurtainPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

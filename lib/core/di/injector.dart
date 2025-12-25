@@ -22,6 +22,12 @@ import '../../features/device/domain/usecases/get_customer_devices.dart';
 import '../../features/device/domain/usecases/delete_device.dart';
 import '../../features/device/presentation/bloc/device_bloc.dart';
 
+// Device Control
+import '../../features/device/data/datasources/device_control_data_source.dart';
+import '../../features/device/data/repositories/device_control_repository_impl.dart';
+import '../../features/device/domain/repositories/device_control_repository.dart';
+import '../../features/device/domain/usecases/send_device_command.dart';
+
 final sl = GetIt.instance;
 
 Future<void> setupInjector() async {
@@ -116,4 +122,35 @@ Future<void> setupInjector() async {
   sl.registerFactory(
     () => DeviceBloc(getCustomerDevices: sl(), deleteDevice: sl()),
   );
+  // ========== Device Control Feature ==========
+  // Device Control Repository
+  sl.registerLazySingleton<DeviceControlDataSource>(
+    () => DeviceControlDataSourceImpl(
+      client: sl<http.Client>(),
+      baseUrl: 'https://performentmarketing.ddnsgeek.com',
+      getToken: () {
+        final token = sl<TokenManager>().getTokenSync();
+        if (token != null && token.isNotEmpty) {
+          return token;
+        }
+
+        try {
+          final authBloc = sl<AuthBloc>();
+          final state = authBloc.state;
+          if (state is AuthSuccess) {
+            return state.token;
+          }
+        } catch (e) {}
+
+        return '';
+      },
+    ),
+  );
+
+  sl.registerLazySingleton<DeviceControlRepository>(
+    () => DeviceControlRepositoryImpl(dataSource: sl()),
+  );
+
+  // Device Control Use Case
+  sl.registerLazySingleton(() => SendDeviceCommand(sl()));
 }
