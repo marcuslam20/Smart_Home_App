@@ -1,9 +1,14 @@
-// home_page.dart – THÊM POPUP MENU KHI CLICK DẤU +
+// home_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:smart_curtain_app/features/home/presentation/pages/CreateSceneTriggerPage.dart';
 import 'package:smart_curtain_app/features/home/presentation/pages/create_scene_page.dart';
 import 'package:smart_curtain_app/features/home/presentation/pages/add_device_page.dart';
 import 'package:smart_curtain_app/features/device/presentation/pages/device_management_page.dart';
+import 'package:smart_curtain_app/features/scene/presentation/bloc/scene_bloc.dart';
+import 'package:smart_curtain_app/features/scene/presentation/bloc/scene_event.dart';
+import 'package:smart_curtain_app/features/scene/presentation/bloc/scene_state.dart';
+import 'package:smart_curtain_app/features/scene/domain/entities/scene_entity.dart';
 
 void main() => runApp(const MaterialApp(home: HomePage()));
 
@@ -263,18 +268,26 @@ class HomePageState extends State<HomePage> {
   }
 }
 
-// AutomationTab - GIỮ NGUYÊN
-class AutomationTab extends StatefulWidget {
+// AutomationTab - BLoC-based
+class AutomationTab extends StatelessWidget {
   const AutomationTab({super.key});
 
-  static final ValueNotifier<List<Map<String, dynamic>>> scenesNotifier =
-      ValueNotifier<List<Map<String, dynamic>>>([]);
+  String _formatRepeatMode(SceneEntity scene) {
+    switch (scene.repeatMode) {
+      case 'once':
+        return 'Mot lan';
+      case 'daily':
+        return 'Hang ngay';
+      case 'weekly':
+        final days = scene.daysOfWeek;
+        if (days == '1,2,3,4,5') return 'Thu 2 - Thu 6';
+        if (days == '6,7') return 'Cuoi tuan';
+        return 'T ${days.replaceAll(',', ', T ')}';
+      default:
+        return scene.repeatMode;
+    }
+  }
 
-  @override
-  State<AutomationTab> createState() => _AutomationTabState();
-}
-
-class _AutomationTabState extends State<AutomationTab> {
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -286,98 +299,42 @@ class _AutomationTabState extends State<AutomationTab> {
           const Row(
             children: [
               Text(
-                "Tự động hóa",
+                "Tu dong hoa",
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
               SizedBox(width: 16),
               Text(
-                "Chạm để chạy",
+                "Cham de chay",
                 style: TextStyle(fontSize: 18, color: Colors.grey),
               ),
             ],
           ),
           const SizedBox(height: 24),
           Expanded(
-            child: ValueListenableBuilder<List<Map<String, dynamic>>>(
-              valueListenable: AutomationTab.scenesNotifier,
-              builder: (context, scenes, _) {
-                if (scenes.isEmpty) return _buildEmptyState();
-
-                return ListView.separated(
-                  itemCount: scenes.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 16),
-                  itemBuilder: (context, index) {
-                    final scene = scenes[index];
-                    final hasOffline = scene['hasOfflineDevices'] == true;
-                    return Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 12,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundColor: Colors.blue.withOpacity(0.15),
-                            child: Icon(
-                              scene['icon'] ?? Icons.access_time,
-                              color: Colors.blue,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  scene['name'],
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                if (hasOffline)
-                                  Row(
-                                    children: const [
-                                      Icon(
-                                        Icons.warning_amber_rounded,
-                                        size: 16,
-                                        color: Colors.orange,
-                                      ),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        "Device(s) offline",
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.orange,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                              ],
-                            ),
-                          ),
-                          Switch(
-                            value: scene['isEnabled'] ?? true,
-                            onChanged: (v) {
-                              scene['isEnabled'] = v;
-                              AutomationTab.scenesNotifier.notifyListeners();
-                            },
-                            activeColor: Colors.green,
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
+            child: BlocBuilder<SceneBloc, SceneState>(
+              builder: (context, state) {
+                if (state is SceneLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (state is SceneError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(state.message, style: const TextStyle(color: Colors.red)),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => context.read<SceneBloc>().add(LoadScenesEvent()),
+                          child: const Text('Thu lai'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                if (state is SceneLoaded && state.scenes.isNotEmpty) {
+                  return _buildSceneList(context, state.scenes);
+                }
+                return _buildEmptyState(context);
               },
             ),
           ),
@@ -386,7 +343,112 @@ class _AutomationTabState extends State<AutomationTab> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildSceneList(BuildContext context, List<SceneEntity> scenes) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<SceneBloc>().add(LoadScenesEvent());
+      },
+      child: ListView.separated(
+        itemCount: scenes.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 16),
+        itemBuilder: (context, index) {
+          final scene = scenes[index];
+          return Dismissible(
+            key: Key('scene_${scene.id}'),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 20),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.delete, color: Colors.white),
+            ),
+            confirmDismiss: (_) async {
+              return await showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Xoa scene?'),
+                  content: Text('Ban co chac muon xoa "${scene.name}"?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Huy'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Xoa', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+            },
+            onDismissed: (_) {
+              context.read<SceneBloc>().add(DeleteSceneEvent(scene.id));
+            },
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.blue.withOpacity(0.15),
+                    child: const Icon(Icons.access_time, color: Colors.blue),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          scene.name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${scene.time} | ${_formatRepeatMode(scene)} | ${scene.action.toUpperCase()}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: scene.enabled,
+                    onChanged: (v) {
+                      context.read<SceneBloc>().add(
+                        ToggleSceneEvent(scene.id, v),
+                      );
+                    },
+                    activeColor: Colors.green,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -397,7 +459,7 @@ class _AutomationTabState extends State<AutomationTab> {
         ),
         const SizedBox(height: 30),
         const Text(
-          "Điều khiển nhiều thiết bị bằng một lần chạm hoặc\nbằng loa hỗ trợ AI thông qua lệnh thoại",
+          "Dieu khien nhieu thiet bi bang mot lan cham hoac\nbang loa ho tro AI thong qua lenh thoai",
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 16, color: Colors.grey, height: 1.5),
         ),

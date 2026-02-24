@@ -1,7 +1,10 @@
-// create_scene_page.dart – HOÀN CHỈNH 100%, KHÔNG CÒN LỖI _HomePageState, SCENE HIỆN NGAY!
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:smart_curtain_app/features/home/presentation/pages/add_task_page.dart';
 import 'package:smart_curtain_app/features/home/presentation/pages/home_page.dart';
+import 'package:smart_curtain_app/features/scene/presentation/bloc/scene_bloc.dart';
+import 'package:smart_curtain_app/features/scene/presentation/bloc/scene_event.dart';
+import 'package:smart_curtain_app/features/scene/presentation/bloc/scene_state.dart';
 
 class CreateScenePage extends StatefulWidget {
   final Map<String, dynamic>? scheduleData;
@@ -24,7 +27,7 @@ class _CreateScenePageState extends State<CreateScenePage> {
 
   void _processScheduleData() {
     if (widget.scheduleData == null) {
-      displayTitle = "Chưa chọn điều kiện";
+      displayTitle = "Chua chon dieu kien";
       displaySubtitle = "";
       return;
     }
@@ -32,20 +35,77 @@ class _CreateScenePageState extends State<CreateScenePage> {
     final data = widget.scheduleData!;
     final type = data['type'] as String;
     final time = data['time'] as TimeOfDay?;
-    final repeat = data['repeat'] as String? ?? "Chỉ một lần";
+    final repeat = data['repeat'] as String? ?? "Chi mot lan";
 
-    if (type == "Mặt trời mọc") {
-      displayTitle = "Mặt trời mọc";
+    if (type == "Mat troi moc") {
+      displayTitle = "Mat troi moc";
       displaySubtitle = repeat;
-    } else if (type == "Hoàng hôn") {
-      displayTitle = "Hoàng hôn";
+    } else if (type == "Hoang hon") {
+      displayTitle = "Hoang hon";
       displaySubtitle = repeat;
     } else {
       final hour = time?.hour.toString().padLeft(2, '0') ?? '--';
       final minute = time?.minute.toString().padLeft(2, '0') ?? '--';
-      displayTitle = "Lịch trình : $hour:$minute";
+      displayTitle = "Lich trinh : $hour:$minute";
       displaySubtitle = repeat;
     }
+  }
+
+  String _getTimeString() {
+    final time = widget.scheduleData?['time'] as TimeOfDay?;
+    if (time == null) return '00:00';
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _getRepeatMode() {
+    final repeat = widget.scheduleData?['repeat'] as String? ?? 'Chỉ một lần';
+    switch (repeat) {
+      case 'Chỉ một lần':
+        return 'once';
+      case 'Hằng ngày':
+        return 'daily';
+      case 'Thứ 2 đến Thứ 6':
+      case 'Cuối tuần':
+      case 'Tùy chỉnh...':
+        return 'weekly';
+      default:
+        return 'once';
+    }
+  }
+
+  String _getDaysOfWeek() {
+    final repeat = widget.scheduleData?['repeat'] as String? ?? 'Chỉ một lần';
+    switch (repeat) {
+      case 'Chỉ một lần':
+        final today = DateTime.now().weekday;
+        return '$today';
+      case 'Hằng ngày':
+        return '1,2,3,4,5,6,7';
+      case 'Thứ 2 đến Thứ 6':
+        return '1,2,3,4,5';
+      case 'Cuối tuần':
+        return '6,7';
+      default:
+        return '1,2,3,4,5,6,7';
+    }
+  }
+
+  String _getAction() {
+    if (_thenActions.isEmpty) return 'on';
+    final action = _thenActions.first['action'] as Map<String, dynamic>?;
+    if (action == null) return 'on';
+    final switchVal = action['switch'] as String?;
+    if (switchVal == 'off') return 'off';
+    return 'on';
+  }
+
+  String _getDeviceId() {
+    if (_thenActions.isEmpty) return '';
+    final device = _thenActions.first['device'];
+    if (device is Map) {
+      return device['id']?.toString() ?? '';
+    }
+    return '';
   }
 
   void _showNameDialogAndSave() {
@@ -69,7 +129,7 @@ class _CreateScenePageState extends State<CreateScenePage> {
             controller: controller,
             autofocus: true,
             decoration: InputDecoration(
-              hintText: "Nhập tên",
+              hintText: "Nhap ten",
               hintStyle: TextStyle(color: Colors.grey[400]),
               filled: true,
               fillColor: Colors.grey[50],
@@ -88,7 +148,7 @@ class _CreateScenePageState extends State<CreateScenePage> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text(
-              "Hủy bỏ",
+              "Huy bo",
               style: TextStyle(color: Colors.black54),
             ),
           ),
@@ -97,42 +157,73 @@ class _CreateScenePageState extends State<CreateScenePage> {
               final name = controller.text.trim();
               if (name.isEmpty) return;
 
-              // Đóng hết các trang
-              Navigator.pop(context); // dialog
-              Navigator.pop(context); // CreateScenePage
-              Navigator.pop(context); // CreateSceneTriggerPage
+              final deviceId = _getDeviceId();
+              if (deviceId.isEmpty) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Vui long chon thiet bi')),
+                );
+                return;
+              }
 
-              // TẠO SCENE MỚI + ÉP HIỆN NGAY
-              final newScene = {
-                'id': DateTime.now().millisecondsSinceEpoch,
-                'name': name,
-                'icon': Icons.access_time,
-                'isEnabled': true,
-                'hasOfflineDevices': _thenActions.any(
-                  (a) => a['device']?['status'] == "Ngoại tuyến",
-                ),
-              };
+              // Create scene via BLoC
+              context.read<SceneBloc>().add(CreateSceneEvent(
+                deviceId: deviceId,
+                name: name,
+                action: _getAction(),
+                time: _getTimeString(),
+                daysOfWeek: _getDaysOfWeek(),
+                repeatMode: _getRepeatMode(),
+              ));
 
-              // DÒNG QUAN TRỌNG NHẤT – DÙNG SETTER ĐÃ CÓ TRONG home_page.dart
-              AutomationTab.scenesNotifier.value = [
-                ...AutomationTab.scenesNotifier.value,
-                newScene,
-              ];
+              // Close dialog
+              Navigator.pop(context);
 
-              // Chuyển về tab "Thông minh" – KHÔNG DÙNG _HomePageState NỮA!
-              Future.delayed(const Duration(milliseconds: 400), () {
-                final homeState = HomePageState.globalKey.currentState;
-                if (homeState != null && homeState.mounted) {
-                  homeState.setState(() => homeState.currentIndex = 1);
-                }
-              });
+              // Show loading then navigate back
+              _showCreatingAndNavigateBack(name);
             },
             child: const Text(
-              "Xác nhận",
+              "Xac nhan",
               style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showCreatingAndNavigateBack(String name) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => BlocListener<SceneBloc, SceneState>(
+        listener: (context, state) {
+          if (state is SceneCreated || state is SceneLoaded) {
+            Navigator.pop(context); // Close loading dialog
+            Navigator.pop(context); // Close CreateScenePage
+            // Switch to automation tab
+            Future.delayed(const Duration(milliseconds: 200), () {
+              final homeState = HomePageState.globalKey.currentState;
+              if (homeState != null && homeState.mounted) {
+                homeState.setState(() => homeState.currentIndex = 1);
+              }
+            });
+          } else if (state is SceneError) {
+            Navigator.pop(context); // Close loading dialog
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Loi: ${state.message}')),
+            );
+          }
+        },
+        child: const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Dang tao scene...'),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -147,13 +238,13 @@ class _CreateScenePageState extends State<CreateScenePage> {
         leading: TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text(
-            "Hủy bỏ",
+            "Huy bo",
             style: TextStyle(color: Colors.black54, fontSize: 16),
           ),
         ),
         leadingWidth: 80,
         title: const Text(
-          "Tạo Ngữ cảnh thông minh",
+          "Tao Ngu canh thong minh",
           style: TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -169,7 +260,7 @@ class _CreateScenePageState extends State<CreateScenePage> {
             const SizedBox(height: 10),
             _buildSection(
               title: "If",
-              subtitle: "Khi bất kỳ điều kiện nào được đáp ứng",
+              subtitle: "Khi bat ky dieu kien nao duoc dap ung",
               addButtonColor: Colors.red,
               child: _buildConditionItem(
                 icon: Icons.access_time,
@@ -192,14 +283,15 @@ class _CreateScenePageState extends State<CreateScenePage> {
                   context,
                   MaterialPageRoute(builder: (_) => const AddTaskPage()),
                 );
-                if (result is Map<String, dynamic>)
+                if (result is Map<String, dynamic>) {
                   setState(() => _thenActions.add(result));
+                }
               },
             ),
             const SizedBox(height: 20),
             _buildOptionRow(
               title: "Precondition",
-              value: "Cả ngày",
+              value: "Ca ngay",
               onTap: () {},
             ),
             const SizedBox(height: 12),
@@ -217,7 +309,7 @@ class _CreateScenePageState extends State<CreateScenePage> {
                   ),
                 ),
                 child: const Text(
-                  "Lưu",
+                  "Luu",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -233,28 +325,17 @@ class _CreateScenePageState extends State<CreateScenePage> {
     );
   }
 
-  // CÁC WIDGET GIỮ NGUYÊN 100% ĐẸP NHƯ CŨ
   Widget _buildActionItem(Map<String, dynamic> action) {
-    final device = action['device'] as Map<String, String>;
+    final device = action['device'] as Map<String, dynamic>;
     final act = action['action'] as Map<String, dynamic>;
-    final deviceName = device['name']!;
-    final isOffline = device['status'] == "Ngoại tuyến";
+    final deviceName = device['name']?.toString() ?? 'Unknown';
+    final isOffline = device['status'] == "Ngoai tuyen" || device['status'] == 'offline';
 
     String actionText = "";
     if (act['switch'] == 'on')
       actionText = "Switch : On";
     else if (act['switch'] == 'off')
       actionText = "Switch : Off";
-    else if (act['direction'] == 'upper')
-      actionText = "Upper";
-    else if (act['direction'] == 'bottom')
-      actionText = "Bottom";
-    else if (act['direction'] == 'auto')
-      actionText = "Auto";
-    else if (act['mode'] != null)
-      actionText = "Mode : ${act['mode']}";
-    else if (act['hold_time'] != null)
-      actionText = "Hold time : ${act['hold_time']} s";
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -273,9 +354,7 @@ class _CreateScenePageState extends State<CreateScenePage> {
       child: Row(
         children: [
           Icon(
-            deviceName.contains("Fingerbot")
-                ? Icons.smart_toy_outlined
-                : Icons.lightbulb_outline,
+            Icons.curtains_outlined,
             size: 32,
             color: isOffline ? Colors.grey : Colors.orange[700],
           ),
@@ -412,7 +491,7 @@ class _CreateScenePageState extends State<CreateScenePage> {
     ),
     child: Center(
       child: Text(
-        "Thêm tác vụ",
+        "Them tac vu",
         style: TextStyle(color: Colors.grey[400], fontSize: 16),
       ),
     ),

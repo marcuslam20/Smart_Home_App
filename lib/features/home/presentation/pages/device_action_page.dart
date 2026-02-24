@@ -1,4 +1,3 @@
-// lib/screens/device_action_page.dart
 import 'package:flutter/material.dart';
 
 class DeviceActionPage extends StatefulWidget {
@@ -11,46 +10,10 @@ class DeviceActionPage extends StatefulWidget {
 
 class _DeviceActionPageState extends State<DeviceActionPage> {
   String? selectedSwitch;
-  String? selectedMode;
-  String? selectedHoldTime;
-  String? selectedDirection;
-
-  // Mở rộng chi tiết khi bấm vào tiêu đề
-  final Set<String> expandedSections = {};
-
-  final Map<String, List<Map<String, dynamic>>> actionConfig = {
-    "Switch": [
-      {"label": "On", "value": "on"},
-      {"label": "Off", "value": "off"},
-    ],
-    "Mode": [
-      {"label": "Click", "value": "click"},
-      {"label": "Press & Hold", "value": "press"},
-    ],
-    "Hold time": [
-      {"label": "0.5s", "value": "0.5s"},
-      {"label": "1.0s", "value": "1.0s"},
-      {"label": "1.5s", "value": "1.5s"},
-      {"label": "2.0s", "value": "2.0s"},
-    ],
-    "Upper": [
-      {"label": "Thực hiện", "value": "upper"},
-    ],
-    "Bottom": [
-      {"label": "Thực hiện", "value": "bottom"},
-    ],
-    "Auto": [
-      {"label": "Thực hiện", "value": "auto"},
-    ],
-  };
 
   @override
   Widget build(BuildContext context) {
     final deviceName = widget.device['name'] as String;
-    final isFingerbot = deviceName.contains('Fingerbot');
-    final List<String> actions = isFingerbot
-        ? ["Switch", "Mode", "Hold time", "Upper", "Bottom", "Auto"]
-        : ["Switch"];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -72,24 +35,23 @@ class _DeviceActionPageState extends State<DeviceActionPage> {
         centerTitle: true,
         actions: [
           TextButton(
-            onPressed: _canConfirm()
+            onPressed: selectedSwitch != null
                 ? () {
                     final result = {
                       'device': widget.device,
                       'action': {
                         'switch': selectedSwitch,
-                        'mode': selectedMode,
-                        'hold_time': selectedHoldTime,
-                        'direction': selectedDirection,
                       },
                     };
                     Navigator.of(context).pop(result);
                   }
                 : null,
             child: Text(
-              "Xác nhận",
+              "Xac nhan",
               style: TextStyle(
-                color: _canConfirm() ? Colors.red : Colors.red.withOpacity(0.4),
+                color: selectedSwitch != null
+                    ? Colors.red
+                    : Colors.red.withOpacity(0.4),
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
               ),
@@ -97,189 +59,91 @@ class _DeviceActionPageState extends State<DeviceActionPage> {
           ),
         ],
       ),
-      body: ListView.separated(
+      body: Padding(
         padding: const EdgeInsets.all(20),
-        itemCount: actions.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final title = actions[index];
-          final options = actionConfig[title]!;
-          final isExpanded = expandedSections.contains(title);
-          final hasSelection = _getSelectedValue(title) != null;
-
-          return Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Chon hanh dong',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
             ),
-            child: Column(
-              children: [
-                // Tiêu đề + icon tick + mũi tên (bấm vào đây để mở)
-                InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () {
-                    setState(() {
-                      if (isExpanded) {
-                        expandedSections.remove(title);
-                      } else {
-                        expandedSections.add(title);
-                      }
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        if (hasSelection)
-                          const Icon(
-                            Icons.check_circle,
-                            color: Colors.red,
-                            size: 24,
-                          ),
-                        const SizedBox(width: 8),
-                        Icon(
-                          isExpanded
-                              ? Icons.keyboard_arrow_up
-                              : Icons.keyboard_arrow_down,
-                          color: Colors.grey,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Nội dung chi tiết (chỉ hiện khi mở rộng)
-                if (isExpanded)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        top: BorderSide(color: Color(0xFFE5E5E5), width: 0.5),
-                      ),
-                    ),
-                    child: Column(
-                      children: options.map((opt) {
-                        final value = opt['value'] as String;
-                        final isSelected = _getSelectedValue(title) == value;
-
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _setValue(title, value);
-                              // Tự động thu gọn sau khi chọn (giống Tuya)
-                              // expandedSections.remove(title);
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            color: Colors.transparent,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    opt['label'],
-                                    style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w600
-                                          : FontWeight.normal,
-                                      color: isSelected
-                                          ? Colors.black
-                                          : Colors.black54,
-                                    ),
-                                  ),
-                                ),
-                                if (isSelected)
-                                  const Icon(
-                                    Icons.check,
-                                    color: Colors.red,
-                                    size: 28,
-                                  ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-              ],
+            const SizedBox(height: 16),
+            _buildActionOption(
+              label: 'Mo rem',
+              value: 'on',
+              icon: Icons.curtains_outlined,
+              color: Colors.green,
             ),
-          );
-        },
+            const SizedBox(height: 12),
+            _buildActionOption(
+              label: 'Dong rem',
+              value: 'off',
+              icon: Icons.curtains_closed_outlined,
+              color: Colors.red,
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  dynamic _getSelectedValue(String title) {
-    return switch (title) {
-      "Switch" => selectedSwitch,
-      "Mode" => selectedMode,
-      "Hold time" => selectedHoldTime,
-      "Upper" => selectedDirection == "upper" ? "upper" : null,
-      "Bottom" => selectedDirection == "bottom" ? "bottom" : null,
-      "Auto" => selectedDirection == "auto" ? "auto" : null,
-      _ => null,
-    };
-  }
-
-  void _setValue(String title, String value) {
-    setState(() {
-      switch (title) {
-        case "Switch":
-          selectedSwitch = value;
-          break;
-        case "Mode":
-          selectedMode = value;
-          break;
-        case "Hold time":
-          selectedHoldTime = value;
-          break;
-        case "Upper":
-          selectedDirection = "upper";
-          break;
-        case "Bottom":
-          selectedDirection = "bottom";
-          break;
-        case "Auto":
-          selectedDirection = "auto";
-          break;
-      }
-    });
-  }
-
-  bool _canConfirm() =>
-      selectedSwitch != null ||
-      selectedMode != null ||
-      selectedHoldTime != null ||
-      selectedDirection != null;
-
-  void _confirm() {
-    final result = {
-      'device': widget.device,
-      'action': {
-        'switch': selectedSwitch,
-        'mode': selectedMode,
-        'hold_time': selectedHoldTime,
-        'direction': selectedDirection,
-      },
-    };
-    Navigator.pop(context, result);
+  Widget _buildActionOption({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    final isSelected = selectedSwitch == value;
+    return GestureDetector(
+      onTap: () => setState(() => selectedSwitch = value),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? color : Colors.transparent,
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? Colors.black : Colors.black87,
+                ),
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_circle, color: color, size: 28),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -10,7 +10,6 @@ class AuthRemoteDataSource {
   final ApiClient apiClient;
   AuthRemoteDataSource({required this.apiClient});
 
-  /// Giả sử API của bạn trả JSON mà login_response_model.dart parse được.
   Future<LoginResponseModel> login(String username, String password) async {
     final response = await apiClient.post(
       '/api/auth/login',

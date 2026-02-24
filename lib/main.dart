@@ -6,6 +6,8 @@ import 'core/di/injector.dart';
 import 'core/base/bloc_observer.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/device/presentation/bloc/device_bloc.dart';
+import 'features/scene/presentation/bloc/scene_bloc.dart';
+import 'features/scene/presentation/bloc/scene_event.dart';
 import 'smart_splash.dart';
 import 'features/home/presentation/pages/home_page.dart';
 import 'features/device/presentation/bloc/device_event.dart';
@@ -50,7 +52,10 @@ class SmartApp extends StatelessWidget {
           create: (_) => GetIt.instance<DeviceBloc>()
             ..add(LoadDevicesEvent()), // tự động load luôn khi app khởi động
         ),
-        // Nếu sau này có SceneBloc, WeatherBloc… cứ thêm tiếp vào đây
+        BlocProvider(
+          create: (_) => GetIt.instance<SceneBloc>()
+            ..add(LoadScenesEvent()),
+        ),
       ],
       child: MaterialApp(
         title: 'Smart Curtain App',

@@ -1,8 +1,8 @@
 // add_device_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-// import 'bluetooth_controller.dart';
 import 'package:smart_curtain_app/features/home/presentation/pages/bluetooth_controller.dart';
+import 'package:smart_curtain_app/features/home/presentation/pages/wifi_config_page.dart';
 
 class AddDevicePage extends StatefulWidget {
   const AddDevicePage({Key? key}) : super(key: key);
@@ -48,6 +48,60 @@ class _AddDevicePageState extends State<AddDevicePage> {
     super.dispose();
   }
 
+  // Logic kết nối CHÍNH XÁC từ main.dart đã test thành công
+  Future<void> _connectAndNavigate(device, String deviceName) async {
+    if (_bluetoothController.isConnecting) return;
+
+    try {
+      // Kết nối với thiết bị
+      final success = await _bluetoothController.connectToDevice(device);
+
+      if (!success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_bluetoothController.errorMessage ?? 'Lỗi kết nối'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Hiển thị thông báo thành công
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✓ Đã kết nối với $deviceName'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        // Chuyển sang màn hình WiFi config - GIỐNG MAIN.DART
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                WiFiConfigPage(device: device, deviceName: deviceName),
+          ),
+        ).then((_) {
+          // Quay lại thì kiểm tra kết nối
+          setState(() {});
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✗ Lỗi kết nối: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider.value(
@@ -70,10 +124,27 @@ class _AddDevicePageState extends State<AddDevicePage> {
             ),
           ),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.qr_code_scanner, color: Colors.black),
-              onPressed: () {
-                // TODO: QR code scanner
+            // Nút disconnect nếu đã kết nối
+            Consumer<BluetoothController>(
+              builder: (context, controller, child) {
+                if (controller.connectedDevice != null) {
+                  return IconButton(
+                    icon: const Icon(Icons.link_off, color: Colors.red),
+                    tooltip: 'Ngắt kết nối',
+                    onPressed: () async {
+                      await controller.disconnect();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Đã ngắt kết nối')),
+                      );
+                    },
+                  );
+                }
+                return IconButton(
+                  icon: const Icon(Icons.qr_code_scanner, color: Colors.black),
+                  onPressed: () {
+                    // TODO: QR code scanner
+                  },
+                );
               },
             ),
           ],
@@ -82,6 +153,74 @@ class _AddDevicePageState extends State<AddDevicePage> {
           builder: (context, controller, child) {
             return Column(
               children: [
+                // Banner "Đã kết nối" nếu có thiết bị đang kết nối - GIỐNG MAIN.DART
+                if (controller.connectedDevice != null)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.green.shade200,
+                        width: 2,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Đã kết nối',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              Text(
+                                'MAC: ${controller.connectedDevice!.remoteId}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.settings),
+                          tooltip: 'Cấu hình WiFi',
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => WiFiConfigPage(
+                                  device: controller.connectedDevice!,
+                                  deviceName: 'ESP32',
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.red),
+                          onPressed: () async {
+                            await controller.disconnect();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Đã ngắt kết nối')),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Header thông báo
                 Container(
                   color: Colors.white,
@@ -153,7 +292,7 @@ class _AddDevicePageState extends State<AddDevicePage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
-                        'Devices will be added automatically. ',
+                        'Tap device to connect. ',
                         style: TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       GestureDetector(
@@ -224,11 +363,22 @@ class _AddDevicePageState extends State<AddDevicePage> {
         final deviceName = controller.getDeviceName(result);
         final rssi = result.rssi;
 
+        // Kiểm tra xem thiết bị có đang kết nối không - GIỐNG MAIN.DART
+        final isConnected =
+            controller.connectedDevice?.remoteId == device.remoteId;
+        final isConnecting =
+            controller.isConnecting &&
+            controller.connectedDevice?.remoteId == device.remoteId;
+
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            // Màu xanh nếu đã kết nối - GIỐNG MAIN.DART
+            color: isConnected ? Colors.green.shade50 : Colors.white,
             borderRadius: BorderRadius.circular(12),
+            border: isConnected
+                ? Border.all(color: Colors.green.shade200, width: 2)
+                : null,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -246,14 +396,29 @@ class _AddDevicePageState extends State<AddDevicePage> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: isConnected ? Colors.green.shade100 : Colors.grey[100],
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.sensors, size: 32, color: Colors.grey),
+              child: isConnecting
+                  ? const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      // Icon khác nếu đã kết nối
+                      isConnected ? Icons.bluetooth_connected : Icons.sensors,
+                      size: 32,
+                      color: isConnected ? Colors.green : Colors.grey,
+                    ),
             ),
             title: Text(
               deviceName,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                // Màu xanh nếu đã kết nối
+                color: isConnected ? Colors.green.shade800 : Colors.black,
+              ),
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,172 +448,22 @@ class _AddDevicePageState extends State<AddDevicePage> {
                 ),
               ],
             ),
-            onTap: () async {
-              // Kết nối và chuyển sang bước tiếp theo
-              final success = await controller.connectToDevice(device);
-              if (success && mounted) {
-                // TODO: Chuyển sang trang nhập WiFi
-                _showWiFiConfigDialog(device, deviceName);
-              } else if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      controller.errorMessage ?? 'Không thể kết nối',
-                    ),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
+            trailing: isConnected
+                // Icon check nếu đã kết nối - GIỐNG MAIN.DART
+                ? const Icon(Icons.check_circle, color: Colors.green, size: 28)
+                : (isConnecting
+                      ? null
+                      : Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: Colors.grey[400],
+                        )),
+            onTap: isConnecting || isConnected
+                ? null
+                : () => _connectAndNavigate(device, deviceName),
           ),
         );
       },
-    );
-  }
-
-  void _showWiFiConfigDialog(device, String deviceName) {
-    final ssidController = TextEditingController();
-    final passwordController = TextEditingController();
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Text('Cấu hình WiFi cho $deviceName'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: ssidController,
-              decoration: const InputDecoration(
-                labelText: 'WiFi SSID',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'WiFi Password',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _bluetoothController.disconnect();
-            },
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final ssid = ssidController.text;
-              final password = passwordController.text;
-
-              if (ssid.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Vui lòng nhập SSID')),
-                );
-                return;
-              }
-
-              Navigator.pop(context);
-              _showLoadingDialog();
-
-              // Gửi WiFi credentials
-              final success = await _bluetoothController.sendWiFiCredentials(
-                ssid,
-                password,
-              );
-
-              if (mounted) {
-                Navigator.pop(context); // Close loading
-
-                if (success) {
-                  // TODO: Tiếp tục với flow claim device
-                  final mac = _bluetoothController.getMacAddress();
-                  _showSuccessAndClaim(mac, deviceName);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        _bluetoothController.errorMessage ?? 'Lỗi gửi WiFi',
-                      ),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Gửi'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showLoadingDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Đang gửi cấu hình WiFi...'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showSuccessAndClaim(String? mac, String deviceName) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('✓ Thành công'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Thiết bị đã nhận cấu hình WiFi'),
-            const SizedBox(height: 8),
-            Text('MAC: $mac'),
-            const SizedBox(height: 16),
-            const Text(
-              'Bước tiếp theo: Claim device trên ThingsBoard',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Close AddDevicePage
-            },
-            child: const Text('Đóng'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO: Navigate to claim flow
-              // hoặc gọi API claim ngay tại đây
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Close AddDevicePage
-
-              // Example: Claim device
-              // await claimDevice(mac, generateSecretKey(mac));
-            },
-            child: const Text('Claim Device'),
-          ),
-        ],
-      ),
     );
   }
 }

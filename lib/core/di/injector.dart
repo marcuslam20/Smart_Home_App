@@ -28,6 +28,16 @@ import '../../features/device/data/repositories/device_control_repository_impl.d
 import '../../features/device/domain/repositories/device_control_repository.dart';
 import '../../features/device/domain/usecases/send_device_command.dart';
 
+// Scene
+import '../../features/scene/data/datasources/scene_remote_datasource.dart';
+import '../../features/scene/data/repositories/scene_repository_impl.dart';
+import '../../features/scene/domain/repositories/scene_repository.dart';
+import '../../features/scene/domain/usecases/get_scenes.dart';
+import '../../features/scene/domain/usecases/create_scene.dart';
+import '../../features/scene/domain/usecases/delete_scene.dart';
+import '../../features/scene/domain/usecases/toggle_scene.dart';
+import '../../features/scene/presentation/bloc/scene_bloc.dart';
+
 final sl = GetIt.instance;
 
 Future<void> setupInjector() async {
@@ -153,4 +163,65 @@ Future<void> setupInjector() async {
 
   // Device Control Use Case
   sl.registerLazySingleton(() => SendDeviceCommand(sl()));
+
+  // ========== Scene Feature ==========
+  // Data sources
+  sl.registerLazySingleton<SceneRemoteDataSource>(
+    () => SceneRemoteDataSourceImpl(
+      client: sl<http.Client>(),
+      schedulerBaseUrl: 'http://1.55.30.61:8000',
+      thingsboardBaseUrl: 'https://performentmarketing.ddnsgeek.com',
+      getToken: () {
+        final token = sl<TokenManager>().getTokenSync();
+        if (token != null && token.isNotEmpty) {
+          return token;
+        }
+        try {
+          final authBloc = sl<AuthBloc>();
+          final state = authBloc.state;
+          if (state is AuthSuccess) {
+            return state.token;
+          }
+        } catch (e) {}
+        return '';
+      },
+      getCustomerId: () {
+        final customerId = sl<TokenManager>().getCustomerIdSync();
+        if (customerId != null && customerId.isNotEmpty) {
+          return customerId;
+        }
+        return '';
+      },
+    ),
+  );
+
+  // Repositories
+  sl.registerLazySingleton<SceneRepository>(
+    () => SceneRepositoryImpl(
+      remoteDataSource: sl(),
+      getCustomerId: () {
+        final customerId = sl<TokenManager>().getCustomerIdSync();
+        if (customerId != null && customerId.isNotEmpty) {
+          return customerId;
+        }
+        return '';
+      },
+    ),
+  );
+
+  // Use cases
+  sl.registerLazySingleton(() => GetScenes(sl()));
+  sl.registerLazySingleton(() => CreateScene(sl()));
+  sl.registerLazySingleton(() => DeleteScene(sl()));
+  sl.registerLazySingleton(() => ToggleScene(sl()));
+
+  // BLoC
+  sl.registerFactory(
+    () => SceneBloc(
+      getScenes: sl(),
+      createScene: sl(),
+      deleteScene: sl(),
+      toggleScene: sl(),
+    ),
+  );
 }

@@ -71,28 +71,21 @@ class _DeviceControlPageState extends State<DeviceControlPage>
         (_) {
           // Thành công → Chạy animation
           print('✅ Command sent successfully');
-          _showSnackBar('✓ Lệnh đã gửi', Colors.green);
 
           if (command == 'OPEN') {
             _controller.animateTo(0.0, curve: Curves.easeInOut);
+            _addAutoStopListener(); // ✨ Thêm listener tự động STOP
           } else if (command == 'CLOSE') {
             _controller.animateTo(1.0, curve: Curves.easeInOut);
+            _addAutoStopListener(); // ✨ Thêm listener tự động STOP
           } else if (command == 'STOP') {
+            // ✨ User nhấn STOP → Dừng ngay
             _controller.stop();
             _pulseController.stop();
             _pulseController.reset();
             setState(() => _isRunning = false);
             return;
           }
-
-          _controller.addStatusListener((status) {
-            if (status == AnimationStatus.completed ||
-                status == AnimationStatus.dismissed) {
-              _pulseController.stop();
-              _pulseController.reset();
-              setState(() => _isRunning = false);
-            }
-          });
         },
       );
     } catch (e) {
@@ -102,6 +95,35 @@ class _DeviceControlPageState extends State<DeviceControlPage>
       _pulseController.reset();
       setState(() => _isRunning = false);
     }
+  }
+
+  // ✨ HÀM MỚI: Tự động gửi STOP khi đến 0% hoặc 100%
+  void _addAutoStopListener() {
+    void statusListener(AnimationStatus status) {
+      if (status == AnimationStatus.completed ||
+          status == AnimationStatus.dismissed) {
+        // Gửi lệnh STOP đến thiết bị
+        print(
+          '📤 Auto sending STOP (reached ${status == AnimationStatus.completed ? "100%" : "0%"})',
+        );
+        _sendDeviceCommand(widget.device.id, 'STOP').then((result) {
+          result.fold(
+            (failure) => print('❌ Auto STOP failed: ${failure.message}'),
+            (_) => print('✅ Auto STOP sent successfully'),
+          );
+        });
+
+        // Dọn dẹp UI
+        _pulseController.stop();
+        _pulseController.reset();
+        setState(() => _isRunning = false);
+
+        // ⚠️ QUAN TRỌNG: Xóa listener để tránh duplicate
+        _controller.removeStatusListener(statusListener);
+      }
+    }
+
+    _controller.addStatusListener(statusListener);
   }
 
   void _showSnackBar(String message, Color color) {
